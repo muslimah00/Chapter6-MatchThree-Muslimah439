@@ -6,8 +6,14 @@ public class TileController : MonoBehaviour
 {
     private static readonly Color selectedColor = new Color(0.5f, 0.5f, 0.5f);
     private static readonly Color normalColor = Color.white;
-
+  
     private static readonly float moveDuration = 0.5f;
+    private static readonly float destroyBigDuration = 0.1f;
+    private static readonly float destroySmallDuration = 0.4f;
+
+    private static readonly Vector2 sizeBig = Vector2.one * 1.2f;
+    private static readonly Vector2 sizeSmall = Vector2.zero;
+    private static readonly Vector2 sizeNormal = Vector2.one;
 
     
     private static readonly Vector2[] adjacentDirection = new Vector2[] { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
@@ -15,6 +21,8 @@ public class TileController : MonoBehaviour
     private static TileController previousSelected = null;
     
     public int id;
+
+    public bool IsDestroyed { get; private set; }
 
     private BoardManager board;
     private SpriteRenderer render;
@@ -57,8 +65,18 @@ public class TileController : MonoBehaviour
 
                     // swap tile
                     SwapTile(otherTile, () => {
+                        if (board.GetAllMatches().Count > 0)
+                        {
+                            Debug.Log("MATCH FOUND");
+                            board.Process();
+                        }
+                        else
+                        {
                             SwapTile(otherTile);
+                        }
                     });
+
+                    // run if cant swap (disabled for now)
                 }
                 // if not adjacent then change selected
                 else
@@ -70,47 +88,14 @@ public class TileController : MonoBehaviour
         }
     }
 
-    private void OnMouseDown()
+    public void ChangeId(int id, int x, int y)
     {
-        // Non Selectable conditions
-        if (render.sprite == null || board.IsAnimating)
-        {
-            return;
-        }
+        render.sprite = board.tileTypes[id];
+        this.id = id;
 
-        // Already selected this tile?
-        if (isSelected)
-        {
-            Deselect();
-        }
-        else
-        {
-            // if nothing selected yet
-            if (previousSelected == null)
-            {
-                Select();
-            }
-
-            else
-            {
-
-                TileController otherTile = previousSelected;
-                // swap tile
-                SwapTile(otherTile, () => {
-                    SwapTile(otherTile);
-                });
-
-                // run if cant swap (disabled for now)
-                //previousSelected.Deselect();
-                //Select();
-            }
-        }
+        name = "TILE_" + id + " (" + x + ", " + y + ")";
     }
 
-    public void SwapTile(TileController otherTile, System.Action onCompleted = null)
-    {
-        StartCoroutine(board.SwapTilePosition(this, otherTile, onCompleted));
-    }
 
     #region Select & Deselect
 
@@ -128,6 +113,34 @@ public class TileController : MonoBehaviour
         previousSelected = null;
     }
 
+    #endregion
+
+    #region swaping and moving
+    public void SwapTile(TileController otherTile, System.Action onCompleted = null)
+    {
+        StartCoroutine(board.SwapTilePosition(this, otherTile, onCompleted));
+    }
+
+    public IEnumerator MoveTilePosition(Vector2 targetPosition, System.Action onCompleted)
+    {
+        Vector2 startPosition = transform.position;
+        float time = 0.0f;
+
+        // run animation on next frame for safety reason
+        yield return new WaitForEndOfFrame();
+
+        while (time < moveDuration)
+        {
+            transform.position = Vector2.Lerp(startPosition, targetPosition, time / moveDuration);
+            time += Time.deltaTime;
+
+            yield return new WaitForEndOfFrame();
+        }
+
+        transform.position = targetPosition;
+
+        onCompleted?.Invoke();
+    }
     #endregion
 
     #region Adjacent
@@ -158,39 +171,135 @@ public class TileController : MonoBehaviour
 
     #endregion
 
-    public void ChangeId(int id, int x, int y)
-    {
-        render.sprite = board.tileTypes[id];
-        this.id = id;
+    #region Check Match
 
-        name = "TILE_" + id + " (" + x + ", " + y + ")";
+    private List<TileController> GetMatch(Vector2 castDir)
+    {
+        List<TileController> matchingTiles = new List<TileController>();
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, castDir, render.size.x);
+
+        while (hit)
+        {
+            TileController otherTile = hit.collider.GetComponent<TileController>();
+            if (otherTile.id != id || otherTile.IsDestroyed)
+            {
+                break;
+            }
+
+            matchingTiles.Add(otherTile);
+            hit = Physics2D.Raycast(otherTile.transform.position, castDir, render.size.x);
+        }
+
+        return matchingTiles;
     }
 
-    public IEnumerator MoveTilePosition(Vector2 targetPosition, System.Action onCompleted)
+    private List<TileController> GetOneLineMatch(Vector2[] paths)
     {
-        Vector2 startPosition = transform.position;
+        List<TileController> matchingTiles = new List<TileController>();
+
+        for (int i = 0; i < paths.Length; i++)
+        {
+            matchingTiles.AddRange(GetMatch(paths[i]));
+        }
+
+        // only match when more than 2 (3 with itself) in one line
+        if (matchingTiles.Count >= 2)
+        {
+            return matchingTiles;
+        }
+
+        return null;
+    }
+
+    public List<TileController> GetAllMatches()
+    {
+        if (IsDestroyed)
+        {
+            return null;
+        }
+
+        List<TileController> matchingTiles = new List<TileController>();
+
+        // get matches for horizontal and vertical
+        List<TileController> horizontalMatchingTiles = GetOneLineMatch(new Vector2[2] { Vector2.up, Vector2.down });
+        List<TileController> verticalMatchingTiles = GetOneLineMatch(new Vector2[2] { Vector2.left, Vector2.right });
+
+        if (horizontalMatchingTiles != null)
+        {
+            matchingTiles.AddRange(horizontalMatchingTiles);
+        }
+
+        if (verticalMatchingTiles != null)
+        {
+            matchingTiles.AddRange(verticalMatchingTiles);
+        }
+
+        // add itself to matched tiles if match found
+        if (matchingTiles != null && matchingTiles.Count >= 2)
+        {
+            matchingTiles.Add(this);
+        }
+
+        return matchingTiles;
+    }
+
+    #endregion
+
+    #region Destroy & Generate
+    public IEnumerator SetDestroyed(System.Action onCompleted)
+    {
+        IsDestroyed = true;
+        id = -1;
+        name = "TILE_NULL";
+
+        Vector2 startSize = transform.localScale;
         float time = 0.0f;
 
-        // run animation on next frame for safety reason
-        yield return new WaitForEndOfFrame();
-
-        while (time < moveDuration)
+        while (time < destroyBigDuration)
         {
-            transform.position = Vector2.Lerp(startPosition, targetPosition, time / moveDuration);
+            transform.localScale = Vector2.Lerp(startSize, sizeBig, time / destroyBigDuration);
             time += Time.deltaTime;
 
             yield return new WaitForEndOfFrame();
         }
 
-        transform.position = targetPosition;
+        transform.localScale = sizeBig;
+
+        startSize = transform.localScale;
+        time = 0.0f;
+
+        while (time < destroySmallDuration)
+        {
+            transform.localScale = Vector2.Lerp(startSize, sizeSmall, time / destroySmallDuration);
+            time += Time.deltaTime;
+
+            yield return new WaitForEndOfFrame();
+        }
+
+        transform.localScale = sizeSmall;
+
+        render.sprite = null;
 
         onCompleted?.Invoke();
     }
+    
+    public void GenerateRandomTile(int x, int y)
+    {
+        transform.localScale = sizeNormal;
+        IsDestroyed = false;
+
+        ChangeId(Random.Range(0, board.tileTypes.Count), x, y);
+    }
+    #endregion
+
+    
+
+    
 
     // Start is called before the first frame update
-    void Start()
+    private void Start()
     {
-        
+        IsDestroyed = false;
     }
 
     // Update is called once per frame
