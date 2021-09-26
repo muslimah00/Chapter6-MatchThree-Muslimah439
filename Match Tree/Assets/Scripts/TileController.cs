@@ -25,12 +25,14 @@ public class TileController : MonoBehaviour
     public bool IsDestroyed { get; private set; }
 
     private BoardManager board;
+    private GameFlowManager game;
     private SpriteRenderer render;
     private bool isSelected = false;
 
     private void Awake()
     {
         board = BoardManager.Instance;
+        game = GameFlowManager.Instance; 
         render = GetComponent<SpriteRenderer>();
     }
 
@@ -41,6 +43,8 @@ public class TileController : MonoBehaviour
         {
             return;
         }
+
+        SoundManager.Instance.PlayTap();
 
         // Already selected this tile?
         if (isSelected)
@@ -57,7 +61,7 @@ public class TileController : MonoBehaviour
 
             else
             {
-                // is this an adjacent tile?
+                // is this an adjacent tiles?
                 if (GetAllAdjacentTiles().Contains(previousSelected))
                 {
                     TileController otherTile = previousSelected;
@@ -67,11 +71,11 @@ public class TileController : MonoBehaviour
                     SwapTile(otherTile, () => {
                         if (board.GetAllMatches().Count > 0)
                         {
-                            Debug.Log("MATCH FOUND");
                             board.Process();
                         }
                         else
                         {
+                            SoundManager.Instance.PlayWrong();
                             SwapTile(otherTile);
                         }
                     });

@@ -54,8 +54,14 @@
   </ItemGroup>
   <ItemGroup>
      <Compile Include="Assets\Scripts\BoardManager.cs" />
+     <Compile Include="Assets\Scripts\GameFlowManager.cs" />
      <Compile Include="Assets\Scripts\ScoreManager.cs" />
+     <Compile Include="Assets\Scripts\SoundManager.cs" />
      <Compile Include="Assets\Scripts\TileController.cs" />
+     <Compile Include="Assets\Scripts\TimeManager.cs" />
+     <Compile Include="Assets\Scripts\UIGameOver.cs" />
+     <Compile Include="Assets\Scripts\UIScore.cs" />
+     <Compile Include="Assets\Scripts\UITime.cs" />
  <Reference Include="Unity.TextMeshPro.Editor">
  <HintPath>C:/Users/MUSLIMA/Documents/GitHub/Chapter6-MatchThree-Muslimah439/Match Tree/Library/ScriptAssemblies/Unity.TextMeshPro.Editor.dll</HintPath>
  </Reference>

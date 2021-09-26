@@ -45,14 +45,14 @@ public class BoardManager : MonoBehaviour
         }
     }
 
-    public bool IsSwapping { get; set; }
     public bool IsProcessing { get; set; }
+    public bool IsSwapping { get; set; }
 
     private Vector2 startPosition;
-
     private Vector2 endPosition;
-
     private TileController[,] tiles;
+
+    private int combo;
 
     // Start is called before the first frame update
     private void Start()
@@ -60,8 +60,8 @@ public class BoardManager : MonoBehaviour
         Vector2 tileSize = tilePrefab.GetComponent<SpriteRenderer>().size;
         CreateBoard(tileSize);
 
-        // IsProcessing = false;
-        // IsSwapping = false;
+        IsProcessing = false;
+        IsSwapping = false;
     }
 
     #region Generate
@@ -144,6 +144,8 @@ public class BoardManager : MonoBehaviour
     public void Process()
     {
         IsProcessing = true;
+        combo = 0;
+
         ProcessMatches();
     }
     
@@ -158,6 +160,9 @@ public class BoardManager : MonoBehaviour
             IsProcessing = false;
             return;
         }
+
+        combo++;
+        ScoreManager.Instance.IncrementCurrentScore(matchingTiles.Count, combo);
 
         StartCoroutine(ClearMatches(matchingTiles, ProcessDrop));
     }
